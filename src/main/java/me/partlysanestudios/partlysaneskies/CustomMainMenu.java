@@ -20,7 +20,9 @@ import gg.essential.elementa.constraints.CenterConstraint;
 import gg.essential.elementa.constraints.PixelConstraint;
 import me.partlysanestudios.partlysaneskies.system.ThemeManager;
 import me.partlysanestudios.partlysaneskies.system.requests.Request;
-import me.partlysanestudios.partlysaneskies.utils.Utils;
+import me.partlysanestudios.partlysaneskies.utils.ElementaUtils;
+import me.partlysanestudios.partlysaneskies.utils.MathUtils;
+import me.partlysanestudios.partlysaneskies.utils.SystemUtils;
 import net.minecraft.client.audio.PositionedSoundRecord;
 import net.minecraft.client.gui.GuiMainMenu;
 import net.minecraft.client.gui.GuiMultiplayer;
@@ -87,6 +89,11 @@ public class CustomMainMenu extends WindowScreen {
     private UIComponent quitText;
     private UIComponent timeText;
     private UIComponent discordText;
+    private static String funFactWebsite = "https://uselessfacts.jsph.pl/today";
+    public static String funFactApi = "https://uselessfacts.jsph.pl/api/v2/facts/today";
+    private static String funFact = "Loading...";
+    private UIWrappedText funFactTitle;
+    private static UIWrappedText funFactText;
     private final String hypixelIP = "mc.hypixel.net"; // I want to use "ilovecatgirls.xyz" to bad
 
     private static ArrayList<Announcement> announcements = new ArrayList<>();
@@ -122,7 +129,7 @@ public class CustomMainMenu extends WindowScreen {
         String image;
 
         if (PartlySaneSkies.config.customMainMenuImage == 0) {
-            image = "textures/gui/main_menu/" + imageIdMap.get(Utils.randInt(1, imageIdMap.size()));
+            image = "textures/gui/main_menu/" + imageIdMap.get(MathUtils.INSTANCE.randInt(1, imageIdMap.size()));
         } else
             image = "textures/gui/main_menu/" + imageIdMap.get(PartlySaneSkies.config.customMainMenuImage);
 
@@ -130,7 +137,7 @@ public class CustomMainMenu extends WindowScreen {
             background = UIImage.ofFile(new File("./config/partly-sane-skies/background.png"));
         }
         else{
-            background = Utils.uiimageFromResourceLocation(new ResourceLocation("partlysaneskies", image));
+            background = ElementaUtils.INSTANCE.uiImageFromResourceLocation(new ResourceLocation("partlysaneskies", image));
         }
 
 
@@ -169,7 +176,7 @@ public class CustomMainMenu extends WindowScreen {
         float titleHeight = 75;
         float titleWidth = titleHeight * (928f / 124);
 
-        titleImage = Utils.uiimageFromResourceLocation(new ResourceLocation("partlysaneskies", "textures/gui/main_menu/title_text.png"))
+        titleImage = ElementaUtils.INSTANCE.uiImageFromResourceLocation((new ResourceLocation("partlysaneskies", "textures/gui/main_menu/title_text.png")))
                 .setX(new CenterConstraint())
                 .setY(new PixelConstraint(50 * scaleFactor))
                 .setHeight(new PixelConstraint(titleHeight * scaleFactor))
@@ -186,7 +193,7 @@ public class CustomMainMenu extends WindowScreen {
                 .setColor(new Color(255, 0, 0))
                 .setChildOf(middleMenu);
             
-            updateWarning.onMouseClickConsumer(event -> Utils.openLink("https://github.com/PartlySaneStudios/partly-sane-skies/releases"));
+            updateWarning.onMouseClickConsumer(event -> SystemUtils.INSTANCE.openLink("https://github.com/PartlySaneStudios/partly-sane-skies/releases"));
         }
 
         if (PartlySaneSkies.config.displayAnnouncementsCustomMainMenu) {
@@ -358,7 +365,25 @@ public class CustomMainMenu extends WindowScreen {
             .setColor(new Color(69, 79, 191))
             .setChildOf(background);
 
-        discordText.onMouseClickConsumer(event -> Utils.openLink("https://discord.gg/" + PartlySaneSkies.discordCode));
+        discordText.onMouseClickConsumer(event -> SystemUtils.INSTANCE.openLink("https://discord.gg/" + PartlySaneSkies.discordCode));
+
+        funFactTitle = (UIWrappedText) new UIWrappedText("Fun Fact of the Day", true, new Color(120, 120, 120), true)
+                .setX(new PixelConstraint((int) background.getWidth() * 0.6f))
+                .setY(new PixelConstraint(10 * scaleFactor + 20))
+                .setWidth(new PixelConstraint(700 * scaleFactor))
+                .setTextScale(new PixelConstraint(1 * scaleFactor))
+                .setColor(new Color(255, 255, 255))
+                .setChildOf(background);
+
+        funFactText = (UIWrappedText) new UIWrappedText(funFact, true, new Color(120, 120, 120), true)
+                .setX(new PixelConstraint((int) background.getWidth() * 0.6f))
+                .setY(new PixelConstraint(25 * scaleFactor + 30))
+                .setWidth(new PixelConstraint(700 * scaleFactor))
+                .setTextScale(new PixelConstraint(1 * scaleFactor))
+                .setColor(new Color(255, 255, 255))
+                .setChildOf(background);
+
+        funFactText.onMouseClickConsumer(event -> SystemUtils.INSTANCE.openLink(funFactWebsite));
     }
 
     public void resizeGui(float scaleFactor) {
@@ -476,6 +501,16 @@ public class CustomMainMenu extends WindowScreen {
                 .setX(new PixelConstraint(10 * scaleFactor))
                 .setY(new PixelConstraint(background.getHeight() - 20 * scaleFactor))
                 .setTextScale(new PixelConstraint(1 * scaleFactor));
+
+        funFactTitle
+                .setX(new PixelConstraint((int) background.getWidth() * 0.6f))
+                .setY(new PixelConstraint(10 * scaleFactor + 20))
+                .setTextScale(new PixelConstraint(1 * scaleFactor));
+
+        funFactText
+                .setX(new PixelConstraint((int) background.getWidth() * 0.6f))
+                .setY(new PixelConstraint(25 * scaleFactor + 30))
+                .setTextScale(new PixelConstraint(1 * scaleFactor));
     }
 
     public static void setMainMenuInfo(Request request) {
@@ -553,6 +588,39 @@ public class CustomMainMenu extends WindowScreen {
         CustomMainMenu.announcements = new ArrayList<>();
     }
 
+    public static void setFunFact(Request request) {
+        if (!request.hasSucceeded()) {
+            return;
+        }
+
+        String responseString = request.getResponse();
+
+        JsonObject object;
+        try {
+            object = new JsonParser().parse(responseString).getAsJsonObject();
+        } catch (NullPointerException | IllegalStateException  e) {
+            noInfoFound();
+            e.printStackTrace();
+            return;
+        }
+            //{"id":"c1dbf293f84042595368168a5b1c558d","text":"%60 of all people using the Internet, use it for pornography.","source":"djtech.net","source_url":"http://www.djtech.net/humor/useless_facts.htm","language":"en","permalink":"https://uselessfacts.jsph.pl/api/v2/facts/c1dbf293f84042595368168a5b1c558d"}
+        try {
+            JsonObject factInfo = object.getAsJsonObject();
+
+            String fact = factInfo.get("text").getAsString();
+            String source = factInfo.get("source").getAsString();
+
+            CustomMainMenu.funFact = fact + "\nSource: " + source;
+            CustomMainMenu.funFactText.setText(CustomMainMenu.funFact);
+
+        } catch (NullPointerException | IllegalStateException | ClassCastException e) {
+            CustomMainMenu.funFact = "Failed to load fun fact.";
+            CustomMainMenu.funFactText.setText(CustomMainMenu.funFact);
+            CustomMainMenu.funFactWebsite = "https://uselessfacts.jsph.pl/today";
+            e.printStackTrace();
+        }
+    }
+
 
     public static class Announcement {
         private final String title;
@@ -597,7 +665,7 @@ public class CustomMainMenu extends WindowScreen {
             this.postNum = postNum;
             this.titleComponent = text;
 
-            text.onMouseClickConsumer(event -> Utils.openLink(link));
+            text.onMouseClickConsumer(event -> SystemUtils.INSTANCE.openLink(link));
             return (UIWrappedText) text;
         }
         public UIWrappedText createDescription(float scaleFactor, int postNum, UIComponent parent) {
@@ -610,7 +678,7 @@ public class CustomMainMenu extends WindowScreen {
             this.postNum = postNum;
             this.descriptionComponent = text;
 
-            text.onMouseClickConsumer(event -> Utils.openLink(link));
+            text.onMouseClickConsumer(event -> SystemUtils.INSTANCE.openLink(link));
             return (UIWrappedText) text;
         }
 
