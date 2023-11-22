@@ -1,10 +1,7 @@
 package me.partlysanestudios.partlysaneskies.modschecker;
 
-import me.partlysanestudios.partlysaneskies.utils.Utils;
 import net.minecraft.launchwrapper.ITweaker;
-import net.minecraft.launchwrapper.Launch;
 import net.minecraft.launchwrapper.LaunchClassLoader;
-import org.apache.logging.log4j.Level;
 
 import java.io.File;
 import java.util.List;

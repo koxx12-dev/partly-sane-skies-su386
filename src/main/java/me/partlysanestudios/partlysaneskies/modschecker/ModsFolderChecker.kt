@@ -112,15 +112,29 @@ object ModsFolderChecker {
         if (!isJsonString(modInfoContent)) {
             return ModFile("", jarFile.name, "", "")
         }
+        val jsonObject = JsonParser().parse(modInfoContent)
 
-        val json = JsonParser().parse(modInfoContent).asJsonArray[0].asJsonObject
+        try {
+            jsonObject.asJsonArray[0]
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return ModFile("", jarFile.name, "", "")
+        }
 
-        val modId = json.get("modid").asString
-        val name = json.get("name").asString
-        val version = json.get("version").asString
-        val fileName = jarFile.name
+        return try {
+            val json = jsonObject.asJsonArray[0].asJsonObject
 
-        return ModFile(modId, fileName, version, name)
+            val modId = json.get("modid").asString
+            val name = json.get("name").asString
+            val version = json.get("version").asString
+            val fileName = jarFile.name
+
+            ModFile(modId, fileName, version, name)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            ModFile("", jarFile.name, "", "")
+        }
+
 
     }
 
