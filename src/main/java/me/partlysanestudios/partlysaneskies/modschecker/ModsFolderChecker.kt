@@ -2,29 +2,62 @@ package me.partlysanestudios.partlysaneskies.modschecker
 
 import com.google.gson.JsonParser
 import me.partlysanestudios.partlysaneskies.PartlySaneSkies
-import org.apache.logging.log4j.LogManager
-import org.apache.logging.log4j.Logger
-import java.awt.Color
-import java.io.File
-import java.io.FileInputStream
-import java.io.IOException
+import java.awt.*
+import java.awt.event.WindowAdapter
+import java.awt.event.WindowEvent
+import java.awt.image.BufferedImage
+import java.io.*
+import java.lang.System.exit
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 import java.util.jar.JarFile
+import javax.imageio.ImageIO
+import javax.swing.JButton
 import javax.swing.JFrame
 import javax.swing.JLabel
+import javax.swing.JPanel
+import javax.swing.border.EmptyBorder
 import kotlin.io.path.Path
 import kotlin.io.path.pathString
+import kotlin.system.exitProcess
 
 
 object ModsFolderChecker {
-    var knownMods: List<KnownMod> = ArrayList()
-    private val logger: Logger = LogManager.getLogger("Partly Sane Skies")
+    private var knownMods: List<KnownMod> = ArrayList()
+//    private val logger: Logger = LogManager.getLogger("Partly Sane Skies")
+    private val unknownFiles = ArrayList<ModFile>()
+    private val unknownMods = ArrayList<ModFile>()
+    private val outdatedMods = ArrayList<ModFile>()
 
+    private var shouldExit = false
 
     fun openWindow() {
+        if (isAllModsSafe()) {
+            return;
+        }
+
         val ui = Frame()
+
+        var closed = false
+
+        ui.addWindowListener(object : WindowAdapter() {
+            override fun windowClosed(e: WindowEvent?) {
+                println("window closed")
+                closed = true
+            }
+        })
+
+        ui.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE)
+
+
+        while (!closed) {
+            println(closed)
+        }
+
+        if (shouldExit) {
+            exitProcess(2)
+        }
 
 
     }
@@ -34,33 +67,20 @@ object ModsFolderChecker {
 //        Makes a list of all the mods in the golder
         val modsInFolder: List<File> = getModsInFolder()
 
-//        Creates two new lists where we will add the supicious mods
-        val unknownFiles = ArrayList<ModFile>()
-        val unknownMods = ArrayList<ModFile>()
-        val outdatedMods = ArrayList<ModFile>()
+//        Creates two new lists where we will add the suspicious mods
 
         for (jarFile: File in modsInFolder) {
-
-//            println("Jar file $jarFile")
-
             val modFile = loadModFile(jarFile)
-
-//            println("Mod file $modFile")
-
-
-
             if (!modFile.isSafe()) {
                 if (modFile.isEmpty()) {
-                    unknownFiles.add(modFile)
+                    if (!unknownFiles.contains(modFile)) unknownFiles.add(modFile)
                 } else {
-                    unknownMods.add(modFile)
-
+                    if (!unknownMods.contains(modFile)) unknownMods.add(modFile)
                 }
             }
             else if (!modFile.findMod().latest && modFile.isSafe()) {
-                outdatedMods.add(modFile)
+                if (!outdatedMods.contains(modFile)) outdatedMods.add(modFile)
             }
-
         }
 
 
@@ -100,6 +120,30 @@ object ModsFolderChecker {
 
 
         return str
+    }
+
+    private fun isAllModsSafe(): Boolean {
+        //        Loads the data
+        loadModDataFromRepo()
+//        Makes a list of all the mods in the golder
+        val modsInFolder: List<File> = getModsInFolder()
+
+//        Creates new lists where we will add the supicious mods
+        for (jarFile: File in modsInFolder) {
+            val modFile = loadModFile(jarFile)
+            if (!modFile.isSafe()) {
+                if (modFile.isEmpty()) {
+                    unknownFiles.add(modFile)
+                } else {
+                    unknownMods.add(modFile)
+                }
+            }
+            else if (!modFile.findMod().latest && modFile.isSafe()) {
+                outdatedMods.add(modFile)
+            }
+        }
+
+        return outdatedMods.isEmpty() && unknownMods.isEmpty() && unknownFiles.isEmpty()
     }
 
     private fun loadModFile(jarFile: File): ModFile {
@@ -334,7 +378,15 @@ object ModsFolderChecker {
 
 
     class Frame: JFrame() {
+
+        private var minecraftFont: Font = Font.createFont(Font.TRUETYPE_FONT, BufferedInputStream(javaClass.getResourceAsStream("/assets/partlysaneskies/fonts/minecraft-font.ttf")))
+
+        private val titleFont = minecraftFont.deriveFont(35.0f)
+        private val headingFont = minecraftFont.deriveFont(25.0f)
+        private val regularFont = minecraftFont.deriveFont(17.5f)
+
         init {
+
             setAlwaysOnTop(true)
             setResizable(false)
 //            defaultCloseOperation = WindowConstants.EXIT_ON_CLOSE
@@ -369,34 +421,35 @@ object ModsFolderChecker {
                 else if (!modFile.findMod().latest && modFile.isSafe()) {
                     outdatedMods.add(modFile)
                 }
-
             }
+            val panel = BackgroundPanel()
+            this.contentPane = panel
 
+//            val panel = JPanel()
+            panel.setLayout(GridLayout(0, 1))
+            panel.font = regularFont
+
+            panel.foreground = Color(0, 0, 0, 0)
 
             val titleLabel = JLabel("Mods")
-
-            val titleFont = titleLabel.font.deriveFont(5)
-            val headingFont = titleLabel.font.deriveFont(2.5f)
-
             titleLabel.font = titleFont
-            contentPane.add(titleLabel)
-            pack()
+            titleLabel.foreground = Color.white
+            titleLabel.setBorder(EmptyBorder(20, 40, 20, 40)) // Adjust the padding as needed
+            panel.add(titleLabel)
 
             if (unknownFiles.size > 0) {
                 val unknownFileHeading = JLabel("Unknown Files:")
                 unknownFileHeading.font = headingFont
                 unknownFileHeading.foreground = Color(255, 0, 0)
-                contentPane.add(unknownFileHeading)
-                pack()
+                unknownFileHeading.setBorder(EmptyBorder(10, 40, 0, 40)) // Adjust the padding as needed
+                panel.add(unknownFileHeading)
 
-                contentPane.add(JLabel("These files are not recognized as mods by Partly Sane Skies."))
-                pack()
-                contentPane.add(JLabel("Proceed at your own risk."))
-                pack()
+                panel.add(regularText("These files are not recognized as mods by Partly Sane Skies."))
+                panel.add(regularText("Proceed at your own risk."))
+
 
                 for (mod in unknownFiles) {
-                    contentPane.add(JLabel("- \"${mod.modName}\" (${mod.path})"))
-                    pack()
+                    panel.add(regularText("- \"${mod.modName}\" (${mod.path})"))
                 }
             }
 
@@ -404,16 +457,15 @@ object ModsFolderChecker {
                 val unknownModHeading = JLabel("Unknown Mod:")
                 unknownModHeading.font = headingFont
                 unknownModHeading.foreground = Color(255, 0, 0)
-                contentPane.add(unknownModHeading)
-                pack()
-                contentPane.add(JLabel("These mods have not been verified by Partly Sane Skies.\nProceed at your own risk.\n\n"))
-                pack()
-                contentPane.add(JLabel("Proceed at your own risk."))
-                pack()
+                unknownModHeading.setBorder(EmptyBorder(10, 40, 0, 40))
+                panel.add(unknownModHeading)
 
-                for (mod in unknownFiles) {
-                    contentPane.add(JLabel("- \"${mod.modName}\" (${mod.path})"))
-                    pack()
+                panel.add(regularText("These mods have not been verified by Partly Sane Skies."))
+                panel.add(regularText("Proceed at your own risk."))
+
+
+                for (mod in unknownMods) {
+                    panel.add(regularText("- \"${mod.modName}\" (${mod.path})"))
                 }
             }
 
@@ -421,27 +473,89 @@ object ModsFolderChecker {
                 val outdatedModHeading = JLabel("Outdated Mod:")
                 outdatedModHeading.font = headingFont
                 outdatedModHeading.foreground = Color(255, 200, 0)
-                contentPane.add(outdatedModHeading)
-                pack()
+                outdatedModHeading.setBorder(EmptyBorder(10, 40, 0, 40))
+                panel.add(outdatedModHeading)
 
-                contentPane.add(JLabel("These mods have not been verified by Partly Sane Skies.\nProceed at your own risk.\n\n"))
-                pack()
-                contentPane.add(JLabel("Proceed at your own risk."))
-                pack()
+                panel.add(regularText("These mods have not been verified by Partly Sane Skies."))
 
-                for (mod in unknownFiles) {
-                    contentPane.add(JLabel("- \"${mod.modName}\" (${mod.path})"))
-                    pack()
+                panel.add(regularText("Proceed at your own risk."))
 
+
+                for (mod in outdatedMods) {
+                    panel.add(regularText("- \"${mod.modName}\" (${mod.path})"))
                 }
             }
 
+            isVisible = true
 
+            val continueButton = JButton("Continue")
+            continueButton.addActionListener {
+                this.dispose()
+                println("Partly Sane Skies: Continuing start...")
+            }
+            panel.add(continueButton)
 
+            val closeButton = JButton("Exit Safely")
+            closeButton.addActionListener {
+                shouldExit = true
+                this.dispose()
+                println("Partly Sane Skies: Exiting Safely...")
+            }
+            panel.add(closeButton)
 
-//            contentPane.add(textLabel)
+//            backgroundPanel.add(panel)
+
             pack()
-            setVisible(true)
+
+        }
+
+        private fun regularText(text: String): JLabel {
+            val label = JLabel(text)
+            label.setBorder(EmptyBorder(10, 40, 0, 40)) // Adjust the padding as needed
+            label.font = regularFont
+            label.foreground = Color.white
+            return label
+        }
+
+        internal class BackgroundPanel : JPanel() {
+            private var backgroundImage: BufferedImage? = null
+
+            init {
+                try {
+                    backgroundImage = ImageIO.read(javaClass.getResourceAsStream("/assets/partlysaneskies/textures/gui/base_color_background.png"))
+                } catch (e: IOException) {
+                    e.printStackTrace()
+                }
+            }
+
+            override fun paintComponent(g: Graphics) {
+                super.paintComponent(g)
+
+                // Draw the background image
+                if (backgroundImage != null) {
+                    g.drawImage(backgroundImage, 0, 0, width, height, this)
+                }
+            }
+
+            override fun getPreferredSize(): Dimension {
+                var maxWidth = 0
+                var totalHeight = 0
+
+                // Calculate the maximum width and total height of all components
+
+                // Calculate the maximum width and total height of all components
+                for (component in components) {
+                    val size = component.preferredSize
+                    maxWidth = Math.max(maxWidth, size.width)
+                    totalHeight += size.height
+                }
+
+                val insets = getInsets()
+                maxWidth += insets.left + insets.right
+                totalHeight += insets.top + insets.bottom
+
+                return Dimension(maxWidth, totalHeight)
+            }
         }
     }
 }
